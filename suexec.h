@@ -24,11 +24,11 @@
 #ifndef _SUEXEC_H
 #define _SUEXEC_H
 
-/*
- * Include ap_config_layout so we can work out where the default htdocsdir
- * and logsdir are.
- */
-#include "ap_config_layout.h"
+#define AP_SUEXEC_VERSION "0.0.1"
+
+#ifndef AP_SUEXEC_CONF
+#define AP_SUEXEC_CONF "/etc/apache2/suexec.conf"
+#endif
 
 /*
  * HTTPD_USER -- Define as the username under which Apache normally
@@ -36,7 +36,7 @@
  *               this program.
  */
 #ifndef AP_HTTPD_USER
-#define AP_HTTPD_USER "www"
+#define AP_HTTPD_USER "www-data"
 #endif
 
 /*
@@ -44,7 +44,7 @@
  *            for suEXEC.  For most systems, 500 or 100 is common.
  */
 #ifndef AP_UID_MIN
-#define AP_UID_MIN 100
+#define AP_UID_MIN 500
 #endif
 
 /*
@@ -86,7 +86,7 @@
  *             debugging purposes.
  */
 #ifndef AP_LOG_EXEC
-#define AP_LOG_EXEC DEFAULT_EXP_LOGFILEDIR "/suexec_log" /* Need me? */
+#define AP_LOG_EXEC "/var/log/apache2/suexec.log" /* Need me? */
 #endif
 
 /*
@@ -95,7 +95,7 @@
  *             that can be used for suEXEC behavior.
  */
 #ifndef AP_DOC_ROOT
-#define AP_DOC_ROOT DEFAULT_EXP_HTDOCSDIR
+#define AP_DOC_ROOT "/srv/www"
 #endif
 
 /*
@@ -104,6 +104,10 @@
  */
 #ifndef AP_SAFE_PATH
 #define AP_SAFE_PATH "/usr/local/bin:/usr/bin:/bin"
+#endif
+
+#ifndef AP_SUEXEC_UMASK
+#define AP_SUEXEC_UMASK 0022
 #endif
 
 #endif /* _SUEXEC_H */
