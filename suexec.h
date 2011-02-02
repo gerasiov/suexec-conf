@@ -1,9 +1,10 @@
-/* Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+/* This is forked version of suexec helper from apache2 distribution.
+ *
+ * Copyright 2009 (c) Apache Software Foundation
+ * Copyright 2011 (c) Alexander GQ Gerasiov <gq@debian.org>
+ *
+ * This file is licensed under Apache License, Version 2.0. You may obtain a
+ * copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -17,7 +18,6 @@
 /**
  * @file  suexec.h
  * @brief user-definable variables for the suexec wrapper code.
- *        (See README.configure on how to customize these variables.)
  */
 
 
