@@ -1,0 +1,9 @@
+# logfile = /etc/apache2/suexec.log
+# min_uid=500
+# min_gid=100
+# always_allow = {"/usr/bin/php5-cgi", "/usr/local/share/scripts/"}
+# httpd_user = "www-data"
+# doc_root = "/srv/www"
+# userdir_suffix = "public_html"
+# umask = 022
+
