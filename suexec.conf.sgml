@@ -1,0 +1,145 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+
+<!-- Process this file with docbook-to-man to generate an nroff manual page:
+ `docbook-to-man suexec.conf.sgml > suexec.conf.5'.
+You may view the manual page with: 
+ `docbook-to-man suexec.conf.sgml | nroff -man | less'.
+
+The docbook-to-man binary is found in the docbook-to-man package.
+-->
+
+<!ENTITY dhfirstname "<firstname>Alexander</firstname>">
+<!ENTITY dhsurname   "<surname>Gerasiov</surname>">
+<!ENTITY dhdate      "<date>2011-02-20</date>">
+<!ENTITY dhsection   "<manvolnum>5</manvolnum>">
+<!ENTITY dhemail     "<email>gq@debian.org</email>">
+<!ENTITY dhusername  "Alexander GQ Gerasiov">
+<!ENTITY dhucpackage "<refentrytitle>suexec.conf</refentrytitle>">
+<!ENTITY dhpackage   "suexec.conf">
+
+<!ENTITY debian      "<productname>Debian</productname>">
+<!ENTITY gnu         "<acronym>GNU</acronym>">
+<!ENTITY gpl         "&gnu; <acronym>GPL</acronym>">
+]>
+
+<refentry>
+	<refentryinfo>
+		<address>
+			&dhemail;
+		</address>
+		<author>
+			&dhfirstname;
+			&dhsurname;
+		</author>
+		<copyright>
+			<year>2011</year>
+			<holder>&dhusername;</holder>
+		</copyright>
+		&dhdate;
+	</refentryinfo>
+	<refmeta>
+		&dhucpackage;
+
+		&dhsection;
+	</refmeta>
+	<refnamediv>
+		<refname>&dhpackage;</refname>
+
+		<refpurpose>configuration file for suexec</refpurpose>
+	</refnamediv>
+	<refsect1>
+		<title>DESCRIPTION</title>
+
+		<para>suexec-conf is the configurable version of classical suexec from apache. Original version doesn't allow you to tune it other way than compile from scratch. This brings some security and speed, but is really annoying when you need to change something (e.g. docroot). That's why suexec-conf was created.</para>
+		<para>This version of suexec reads configuration file on execute. On Debian system it should be located in /etc/apache2/suexec.conf</para>
+		<para>NB: After modifying config file you should run <command>suexec -V</command> to see that everything is ok.</para>
+	</refsect1>
+	<refsect1>
+		<title>OPTIONS</title>
+
+		<para>suexec.conf contains a list of key=value strings. Details about syntax could be found in libconfuse documentation.</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>logfile</option>
+				</term>
+				<listitem>
+					<para>Location of logfile. Default "/var/log/apache2/suexec.log".</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>httpd_user</option>
+				</term>
+				<listitem>
+					<para>User allowed to run suexec. Should be equal to user running apache. Default "www-data".</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>min_uid</option>
+				</term>
+				<listitem>
+					<para>Minimum uid allowed to setuid to. Default 500.</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>min_gid</option>
+				</term>
+				<listitem>
+					<para>Minimum gid allowed to setgid to. Default 100.</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>doc_root</option>
+				</term>
+				<listitem>
+					<para>Document root where executing command should be located. Default "/srv/www".</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>userdir_suffix</option>
+				</term>
+				<listitem>
+					<para>If userdir requested (see mod_userdir for details), where is docroot in user's home. Default "public_html".</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>umask</option>
+				</term>
+				<listitem>
+					<para>Umask to set when executing command. Default 0700.</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>always_allow</option>
+				</term>
+				<listitem>
+					<para>Which command allow to execute even if they are out of doc_root or owner by user different from one we setuid to. Default {null}. Should be specified as list. E.g.</para>
+					<para>always_allow={"/path/to/bin1","/path/to/bin2","/path/to/dir/"}</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+	</refsect1>
+	<refsect1>
+		<title>AUTHOR</title>
+
+		<para>This manual page was written by &dhusername; &dhemail;.  Permission is granted to copy, distribute and/or modify this document under Apache License, Version 2.0.
+		</para>
+	</refsect1>
+</refentry>
+
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:t
+sgml-shorttag:t
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-default-dtd-file:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->
