@@ -39,6 +39,8 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include <confuse.h>
+
 #if defined(PATH_MAX)
 #define AP_MAXPATH PATH_MAX
 #elif defined(MAXPATHLEN)
@@ -51,6 +53,22 @@
 
 extern char **environ;
 static FILE *log = NULL;
+
+static cfg_t *cfg = 0;
+
+static const char * config_file = AP_SUEXEC_CONF;
+cfg_opt_t config_opts[] =
+{
+        CFG_STR("logfile", AP_LOG_EXEC, CFGF_NONE),
+        CFG_STR_LIST("always_allow", "", CFGF_NONE),
+        CFG_INT("min_uid", AP_UID_MIN, CFGF_NONE),
+        CFG_INT("min_gid", AP_GID_MIN, CFGF_NONE),
+        CFG_STR("httpd_user", AP_HTTPD_USER, CFGF_NONE),
+        CFG_STR("doc_root", AP_DOC_ROOT, CFGF_NONE),
+        CFG_STR("userdir_suffix", AP_USERDIR_SUFFIX, CFGF_NONE),
+        CFG_INT("umask", AP_SUEXEC_UMASK, CFGF_NONE),
+        CFG_END()
+};
 
 static const char *const safe_env_lst[] =
 {
@@ -108,12 +126,11 @@ static const char *const safe_env_lst[] =
 
 static void err_output(int is_error, const char *fmt, va_list ap)
 {
-#ifdef AP_LOG_EXEC
     time_t timevar;
     struct tm *lt;
 
     if (!log) {
-        if ((log = fopen(AP_LOG_EXEC, "a")) == NULL) {
+        if ((log = fopen(cfg_getstr(cfg, "logfile"), "a")) == NULL) {
             fprintf(stderr, "suexec failure: could not open log file\n");
             perror("fopen");
             exit(1);
@@ -135,31 +152,26 @@ static void err_output(int is_error, const char *fmt, va_list ap)
     vfprintf(log, fmt, ap);
 
     fflush(log);
-#endif /* AP_LOG_EXEC */
     return;
 }
 
 static void log_err(const char *fmt,...)
 {
-#ifdef AP_LOG_EXEC
     va_list ap;
 
     va_start(ap, fmt);
     err_output(1, fmt, ap); /* 1 == is_error */
     va_end(ap);
-#endif /* AP_LOG_EXEC */
     return;
 }
 
 static void log_no_err(const char *fmt,...)
 {
-#ifdef AP_LOG_EXEC
     va_list ap;
 
     va_start(ap, fmt);
     err_output(0, fmt, ap); /* 0 == !is_error */
     va_end(ap);
-#endif /* AP_LOG_EXEC */
     return;
 }
 
@@ -183,7 +195,7 @@ static void clean_env(void)
     environ = &empty_ptr; /* VERY safe environment */
 
     if ((cleanenv = (char **) calloc(AP_ENVBUF, sizeof(char *))) == NULL) {
-        log_err("failed to malloc memory for environment\n");
+        fprintf(stderr, "fatal: suexec failed to malloc memory for environment\n");
         exit(120);
     }
 
@@ -219,6 +231,7 @@ int main(int argc, char *argv[])
     char *actual_gname;     /* actual group name         */
     char *prog;             /* name of this program      */
     char *cmd;              /* command to be executed    */
+    char cpath[AP_MAXPATH]; /* command full path         */
     char cwd[AP_MAXPATH];   /* current working directory */
     char dwd[AP_MAXPATH];   /* docroot working directory */
     struct passwd *pw;      /* password entry holder     */
@@ -226,11 +239,20 @@ int main(int argc, char *argv[])
     struct stat dir_info;   /* directory info holder     */
     struct stat prg_info;   /* program info holder       */
     int cwdh;               /* handle to cwd             */
+    int allow_size;         /* size of always_allow list */
+    int allowed = 0;        /* allowed flag              */
+    int i;
 
     /*
      * Start with a "clean" environment
      */
     clean_env();
+
+    cfg = cfg_init(config_opts, CFGF_NONE);
+    if(cfg_parse(cfg, config_file) == CFG_PARSE_ERROR) {
+        fprintf(stderr, "fatal: suexec failed to load config file %s\n", config_file);
+        exit(99);
+    }
 
     prog = argv[0];
     /*
@@ -246,40 +268,18 @@ int main(int argc, char *argv[])
      * See if this is a 'how were you compiled' request, and
      * comply if so.
      */
-    if ((argc > 1)
-        && (! strcmp(argv[1], "-V"))
-        && ((uid == 0)
-#ifdef _OSD_POSIX
-        /* User name comparisons are case insensitive on BS2000/OSD */
-            || (! strcasecmp(AP_HTTPD_USER, pw->pw_name)))
-#else  /* _OSD_POSIX */
-            || (! strcmp(AP_HTTPD_USER, pw->pw_name)))
-#endif /* _OSD_POSIX */
-        ) {
-#ifdef AP_DOC_ROOT
-        fprintf(stderr, " -D AP_DOC_ROOT=\"%s\"\n", AP_DOC_ROOT);
-#endif
-#ifdef AP_GID_MIN
-        fprintf(stderr, " -D AP_GID_MIN=%d\n", AP_GID_MIN);
-#endif
-#ifdef AP_HTTPD_USER
-        fprintf(stderr, " -D AP_HTTPD_USER=\"%s\"\n", AP_HTTPD_USER);
-#endif
-#ifdef AP_LOG_EXEC
-        fprintf(stderr, " -D AP_LOG_EXEC=\"%s\"\n", AP_LOG_EXEC);
-#endif
-#ifdef AP_SAFE_PATH
-        fprintf(stderr, " -D AP_SAFE_PATH=\"%s\"\n", AP_SAFE_PATH);
-#endif
-#ifdef AP_SUEXEC_UMASK
-        fprintf(stderr, " -D AP_SUEXEC_UMASK=%03o\n", AP_SUEXEC_UMASK);
-#endif
-#ifdef AP_UID_MIN
-        fprintf(stderr, " -D AP_UID_MIN=%d\n", AP_UID_MIN);
-#endif
-#ifdef AP_USERDIR_SUFFIX
-        fprintf(stderr, " -D AP_USERDIR_SUFFIX=\"%s\"\n", AP_USERDIR_SUFFIX);
-#endif
+    if ((argc == 2)
+        && (! strcmp(argv[1], "-V"))) {
+        fprintf(stderr, "suexec-conf version %s\n",   AP_SUEXEC_VERSION);
+        fprintf(stderr, " config_file=\"%s\"\n",    config_file);
+        fprintf(stderr, " logfile=\"%s\"\n",        cfg_getstr(cfg, "logfile"));
+        fprintf(stderr, " httpd_user=\"%s\"\n",     cfg_getstr(cfg, "httpd_user"));
+        fprintf(stderr, " min_uid=%d\n",            cfg_getint(cfg, "min_uid"));
+        fprintf(stderr, " min_gid=%d\n",            cfg_getint(cfg, "min_gid"));
+        fprintf(stderr, " doc_root=\"%s\"\n",       cfg_getstr(cfg, "doc_root"));
+        fprintf(stderr, " umask=%04o\n",            cfg_getint(cfg, "umask"));
+        fprintf(stderr, " userdir_suffix=\"%s\"\n", cfg_getstr(cfg, "userdir_suffix"));
+        fprintf(stderr, " always_allow=\"%s\"\n",   cfg_getstr(cfg, "always_allow"));
         exit(0);
     }
     /*
@@ -301,28 +301,17 @@ int main(int argc, char *argv[])
      */
 #ifdef _OSD_POSIX
     /* User name comparisons are case insensitive on BS2000/OSD */
-    if (strcasecmp(AP_HTTPD_USER, pw->pw_name)) {
-        log_err("user mismatch (%s instead of %s)\n", pw->pw_name, AP_HTTPD_USER);
+    if (strcasecmp(cfg_getstr(cfg, "httpd_user"), pw->pw_name)) {
+        log_err("user mismatch (%s instead of %s)\n", pw->pw_name, cfg_getstr(cfg, "httpd_user"));
         exit(103);
     }
 #else  /*_OSD_POSIX*/
-    if (strcmp(AP_HTTPD_USER, pw->pw_name)) {
-        log_err("user mismatch (%s instead of %s)\n", pw->pw_name, AP_HTTPD_USER);
+    if (strcmp(cfg_getstr(cfg, "httpd_user"), pw->pw_name)) {
+        log_err("user mismatch (%s instead of %s)\n", pw->pw_name, cfg_getstr(cfg, "httpd_user"));
         exit(103);
     }
 #endif /*_OSD_POSIX*/
 
-    /*
-     * Check for a leading '/' (absolute path) in the command to be executed,
-     * or attempts to back up out of the current directory,
-     * to protect against attacks.  If any are
-     * found, error out.  Naughty naughty crackers.
-     */
-    if ((cmd[0] == '/') || (!strncmp(cmd, "../", 3))
-        || (strstr(cmd, "/../") != NULL)) {
-        log_err("invalid command (%s)\n", cmd);
-        exit(104);
-    }
 
     /*
      * Check to see if this is a ~userdir request.  If
@@ -415,7 +404,7 @@ int main(int argc, char *argv[])
      * Error out if attempt is made to execute as root or as
      * a UID less than AP_UID_MIN.  Tsk tsk.
      */
-    if ((uid == 0) || (uid < AP_UID_MIN)) {
+    if ((uid == 0) || (uid < cfg_getint(cfg, "min_uid"))) {
         log_err("cannot run as forbidden uid (%d/%s)\n", uid, cmd);
         exit(107);
     }
@@ -424,7 +413,7 @@ int main(int argc, char *argv[])
      * Error out if attempt is made to execute as root group
      * or as a GID less than AP_GID_MIN.  Tsk tsk.
      */
-    if ((gid == 0) || (gid < AP_GID_MIN)) {
+    if ((gid == 0) || (gid < cfg_getint(cfg, "min_gid"))) {
         log_err("cannot run as forbidden gid (%d/%s)\n", gid, cmd);
         exit(108);
     }
@@ -456,43 +445,72 @@ int main(int argc, char *argv[])
      * Use chdir()s and getcwd()s to avoid problems with symlinked
      * directories.  Yuck.
      */
-    if (getcwd(cwd, AP_MAXPATH) == NULL) {
+    if (getcwd(cwd, AP_MAXPATH) == 0) {
         log_err("cannot get current working directory\n");
         exit(111);
     }
 
     if ( (cwdh = open(".", O_RDONLY)) == -1 ) {
         log_err("cannot open current working directory\n");
-	exit(111);
+        exit(111);
     }
 
     if (userdir) {
         if (((chdir(target_homedir)) != 0) ||
-            ((chdir(AP_USERDIR_SUFFIX)) != 0) ||
-            ((getcwd(dwd, AP_MAXPATH)) == NULL) ||
+            ((chdir(cfg_getstr(cfg, "userdir_suffix"))) != 0) ||
+            ((getcwd(dwd, AP_MAXPATH)) == 0) ||
             ((fchdir(cwdh)) != 0)) {
             log_err("cannot get docroot information (%s)\n", target_homedir);
             exit(112);
         }
     }
     else {
-        if (((chdir(AP_DOC_ROOT)) != 0) ||
-            ((getcwd(dwd, AP_MAXPATH)) == NULL) ||
+        if (((chdir(cfg_getstr(cfg, "doc_root"))) != 0) ||
+            ((getcwd(dwd, AP_MAXPATH)) == 0) ||
             ((fchdir(cwdh)) != 0)) {
-            log_err("cannot get docroot information (%s)\n", AP_DOC_ROOT);
+            log_err("cannot get docroot information (%s)\n", cfg_getstr(cfg, "doc_root"));
             exit(113);
         }
     }
 
     close(cwdh);
 
-    if (strlen(cwd) > strlen(dwd)) {
-        strncat(dwd, "/", AP_MAXPATH);
-        dwd[AP_MAXPATH-1] = '\0';
+    if (snprintf((char *)&cpath, AP_MAXPATH, "%s/%s", cwd, cmd) < 0) {
+	log_err("cannot get full cmd path\n");
+	exit(150);
     }
-    if ((strncmp(cwd, dwd, strlen(dwd))) != 0) {
-        log_err("command not in docroot (%s/%s)\n", cwd, cmd);
-        exit(114);
+
+    allow_size = cfg_size(cfg, "always_allow");
+
+    for(i = 0; i < allow_size; i++) {
+        const char * allow_cmd = cfg_getnstr(cfg, "always_allow", i);
+        if (strncmp(cpath, allow_cmd, strlen(allow_cmd)) == 0) {
+            allowed = 1;
+            break;
+        }
+    }
+
+    if (!allowed) {
+         /*
+         * Check for a leading '/' (absolute path) in the command to be executed,
+         * or attempts to back up out of the current directory,
+         * to protect against attacks.  If any are
+         * found, error out.  Naughty naughty crackers.
+         */
+        if ((cmd[0] == '/') || (!strncmp(cmd, "../", 3))
+            || (strstr(cmd, "/../") != NULL)) {
+            log_err("invalid command (%s)\n", cmd);
+            exit(104);
+        }
+
+        if (strlen(cwd) > strlen(dwd)) {
+            strncat(dwd, "/", AP_MAXPATH);
+            dwd[AP_MAXPATH-1] = '\0';
+        }
+        if ((strncmp(cwd, dwd, strlen(dwd))) != 0) {
+            log_err("command not in docroot (%s/%s)\n", cwd, cmd);
+            exit(114);
+        }
     }
 
     /*
@@ -535,20 +553,37 @@ int main(int argc, char *argv[])
         exit(119);
     }
 
-    /*
-     * Error out if the target name/group is different from
-     * the name/group of the cwd or the program.
-     */
-    if ((uid != dir_info.st_uid) ||
-        (gid != dir_info.st_gid) ||
-        (uid != prg_info.st_uid) ||
-        (gid != prg_info.st_gid)) {
-        log_err("target uid/gid (%ld/%ld) mismatch "
-                "with directory (%ld/%ld) or program (%ld/%ld)\n",
-                uid, gid,
+    if (allowed) {
+        /*
+         * Error out if command is in the allowed list, but cmd or cwd
+         * is not owned by root/root.
+         */
+        if ((dir_info.st_uid != 0) ||
+            (dir_info.st_gid != 0) ||
+            (prg_info.st_uid != 0) ||
+            (prg_info.st_gid != 0)) {
+        log_err("target is in allowed list, but uid/gid of "
+                "directory (%ld/%ld) or program (%ld/%ld) is not root/root\n",
                 dir_info.st_uid, dir_info.st_gid,
                 prg_info.st_uid, prg_info.st_gid);
         exit(120);
+        }
+    } else {
+        /*
+         * Error out if the target name/group is different from
+         * the name/group of the cwd or the program.
+         */
+        if ((uid != dir_info.st_uid) ||
+            (gid != dir_info.st_gid) ||
+            (uid != prg_info.st_uid) ||
+            (gid != prg_info.st_gid)) {
+            log_err("target uid/gid (%ld/%ld) mismatch "
+                    "with directory (%ld/%ld) or program (%ld/%ld)\n",
+                    uid, gid,
+                    dir_info.st_uid, dir_info.st_gid,
+                    prg_info.st_uid, prg_info.st_gid);
+            exit(120);
+        }
     }
     /*
      * Error out if the program is not executable for the user.
@@ -560,16 +595,14 @@ int main(int argc, char *argv[])
         exit(121);
     }
 
-#ifdef AP_SUEXEC_UMASK
     /*
      * umask() uses inverse logic; bits are CLEAR for allowed access.
      */
-    if ((~AP_SUEXEC_UMASK) & 0022) {
-        log_err("notice: AP_SUEXEC_UMASK of %03o allows "
-                "write permission to group and/or other\n", AP_SUEXEC_UMASK);
+    if ((~cfg_getint(cfg, "umask")) & 0022) {
+        log_err("notice: umask of %03o allows "
+                "write permission to group and/or other\n", cfg_getint(cfg, "umask"));
     }
-    umask(AP_SUEXEC_UMASK);
-#endif /* AP_SUEXEC_UMASK */
+    umask(cfg_getint(cfg, "umask"));
 
     /*
      * ask fcntl(2) to set the FD_CLOEXEC flag on the log file,
