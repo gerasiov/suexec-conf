@@ -1,0 +1,23 @@
+How to setup php as FastCGI using suexec for securing users.
+
+Install apache with mod_fcgid, mod_suexec. Enable this modules.
+Install php5-cgi.
+Install suexec-conf.
+
+Create /etc/apache2/conf.d/fcgid_php.conf with the following content:
+<IfModule mod_fcgid.c>
+  AddHandler    fcgid-script .php
+  FcgidWrapper /usr/bin/php5-cgi .php
+  FcgidMaxRequestsPerProcess 5000
+  FcgidInitialEnv PHP_FCGI_MAX_REQUESTS 5000
+</IfModule>
+
+For every user of your web-hosting set
+SuexecUserGroup username groupname
+somewhere (e.g. in VirtualHost)
+
+In /etc/apache2/suexec.conf allow /usr/bin/php5-cgi to be executed:
+always_allow = {"/usr/bin/php5-cgi"}
+
+Restart apache.
+PROFIT!
