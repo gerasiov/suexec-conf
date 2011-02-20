@@ -1,0 +1,26 @@
+What is suexec-conf?
+
+Well, apache ships tool called suexec which works together with mod_suexec.
+They allow CGI scripts to run as a specified user and group. You can find more
+information on
+
+http://httpd.apache.org/docs/current/suexec.html
+
+Original suexec do some strict checks on start up to provide some security.
+This checks are really good, but unfortunately the only way you can configure
+it - recompile from sources.
+
+Another problem of original suexec is that is requires that running script
+should be owned by the same user suexec setuids to. But there are situation,
+when you want different users be able to run shared script (owned by root for
+security), or you may want to setup wrapper for some file's types (e.g.
+/usr/bin/php-cgi for .php) which is common for all users. In such cases
+original suexec will not work, but suexec-conf will do.
+
+suexec-conf is the configurable version of classical suexec from apache.
+
+For now it allows you to configure everything, you could configure for
+classic suexec on compile time. And it also support always_allow option where
+you could list scripts/command which should be owned by root, but not the user
+suexec setuids to.
+
