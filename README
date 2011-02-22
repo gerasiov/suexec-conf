@@ -24,3 +24,8 @@ classic suexec on compile time. And it also support always_allow option where
 you could list scripts/command which should be owned by root, but not the user
 suexec setuids to.
 
+How to compile suexec-conf?
+
+You need libconfuse and docbook-to-man (if you want to build manpage). I am too
+lazy to use normal build system, so I wrote simple Makefile. Feel free to port
+building to CMake and send me a patch.
