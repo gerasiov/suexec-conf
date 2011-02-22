@@ -29,3 +29,20 @@ How to compile suexec-conf?
 You need libconfuse and docbook-to-man (if you want to build manpage). I am too
 lazy to use normal build system, so I wrote simple Makefile. Feel free to port
 building to CMake and send me a patch.
+
+Is suexec-conf stable/secure?
+
+Well. It is based on original suexec, which should be called stable and secure.
+I think I understand all the checks it does. And try to modify the way it stays
+secure. But I can't guarantee it, of course. I'll be glad if someone try to
+audit my changes.
+As of stability, I don't know exactly right now. Lets see how it will work.
+Anyway, if you don't really need suexec-conf and it's features, please use
+original suexec from apache distribution.
+
+Are there any speed issues with suexec-conf?
+
+suexec-conf should be a little bit slower, than original suexec. At least it
+reads and parses config file on start. But I didn't do any performance tests
+yet.
+
