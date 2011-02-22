@@ -57,6 +57,7 @@ static const char *const safe_env_lst[] =
     /* variable name starts with */
     "HTTP_",
     "SSL_",
+    "PHP_",
 
     /* variable name is */
     "AUTH_TYPE=",
